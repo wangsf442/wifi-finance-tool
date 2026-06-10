@@ -1,0 +1,15 @@
+{
+  "name": "wifi-finance-tool",
+  "version": "1.0.0",
+  "description": "AI Financial Tool for WiFi Business",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}

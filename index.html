@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI财务测算工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; padding: 20px; }
+        .metric-value { font-size: 2rem; font-weight: 700; }
+        .input-field { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; }
+        .btn-primary { background-color: #2563eb; color: white; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .text-profit { color: #16a34a; }
+        .text-loss { color: #dc2626; }
+        .table-cell { padding: 12px 16px; text-align: left; }
+        #chatContainer { height: 360px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background-color: #f9fafb; }
+        .chat-message { margin-bottom: 12px; }
+        .chat-user { font-weight: 600; color: #1f2937; }
+        .chat-ai { font-weight: 600; color: #2563eb; }
+        .chat-text { margin-top: 4px; color: #374151; white-space: pre-wrap; }
+        .manual-input-area { margin-top: 12px; padding-top: 8px; border-top: 1px dashed #d1d5db; }
+        .manual-input-area label { font-weight: 600; }
+        .manual-input-area input { font-family: monospace; }
+    </style>
+</head>
+<body class="p-6">
+
+<div class="max-w-7xl mx-auto">
+    <div class="card mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">📊 AI财务测算工具</h1>
+        <p class="text-gray-600 mt-2">预测一个批次发货后18个月的财务表现</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 左侧输入区 -->
+        <div class="lg:col-span-1 space-y-6">
+            <div class="card">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">1. 发货与成本</h2>
+                <div class="input-group mb-3">
+                    <label class="text-sm font-bold text-gray-700">总发货量 (台)</label>
+                    <input type="number" id="totalShipment" class="input-field" value="10000">
+                </div>
+                <div class="input-group mb-3">
+                    <label class="text-sm font-bold text-gray-700">测算周期 (月)</label>
+                    <input type="number" id="forecastMonths" class="input-field" value="18" onchange="updateMonths()">
+                </div>
+                <div class="input-group mb-3">
+                    <label class="text-sm font-bold text-gray-700">月租金 (元)</label>
+                    <input type="number" id="rent" class="input-field" value="20000">
+                </div>
+                <div class="input-group mb-3">
+                    <label class="text-sm font-bold text-gray-700">月工资 (元)</label>
+                    <input type="number" id="wage" class="input-field" value="200000">
+                </div>
+                <div class="input-group mb-3">
+                    <label class="text-sm font-bold text-gray-700">翻新成本 (元/月)</label>
+                    <input type="number" id="refurbCost" class="input-field" value="0">
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">2. 套餐与用户行为</h2>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="text-sm font-bold">平台</label>
+                        <select id="platform" class="input-field">
+                            <option value="抖音">抖音</option><option value="天猫">天猫</option>
+                            <option value="京东">京东</option><option value="拼多多">拼多多</option>
+                            <option value="快手">快手</option>
+                            <option value="淘宝">淘宝</option>
+                        </select>
+                    </div>
+                    <div><label class="text-sm font-bold">套餐定价 (元)</label><input type="number" id="price" class="input-field" value="29"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="text-sm font-bold">套餐用量 (GB)</label><input type="number" id="data_gb" class="input-field" value="100"></div>
+                    <div><label class="text-sm font-bold">套餐类型</label>
+                        <select id="type" class="input-field"><option value="月包">月包</option><option value="长周期">长周期</option></select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="text-sm font-bold">套餐种类</label>
+                        <select id="category" class="input-field">
+                            <option value="主套餐">主套餐</option><option value="体验套餐">体验套餐</option>
+                            <option value="加油包">加油包</option>
+                        </select>
+                    </div>
+                    <div><label class="text-sm font-bold">套餐周期 (天)</label><input type="number" id="period_days" class="input-field" value="30"></div>
+                </div>
+                <div class="input-group mb-3">
+                    <label class="text-sm font-bold">首充率 (%)</label>
+                    <input type="number" id="firstChargeRate" class="input-field" value="85">
+                </div>
+
+                <div id="manualInputArea" class="manual-input-area" style="display: none;">
+                    <label class="text-sm font-bold text-gray-700">📝 手动输入复充率</label>
+                    <input type="text" id="manualRates" class="input-field mt-1" placeholder="例：1.0,0.72,0.58,...">
+                    <p class="text-xs text-gray-500 mt-1">顺序：第2月→第18月，17个数字（0~1），英文逗号分隔</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">3. 成本参数</h2>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="text-sm font-bold">硬件采购价 (元)</label><input type="number" id="hwCost" class="input-field" value="70"></div>
+                    <div><label class="text-sm font-bold">终端售价 (元)</label><input type="number" id="hwPrice" class="input-field" value="59"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="text-sm font-bold">单台推广费 (元)</label><input type="number" id="marketingCost" class="input-field" value="30"></div>
+                    <div><label class="text-sm font-bold">一退率 (%)</label><input type="number" id="return1" class="input-field" value="5"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div><label class="text-sm font-bold">二/三退率 (%)</label><input type="number" id="return2" class="input-field" value="3"></div>
+                    <div><label class="text-sm font-bold">沉默率 (%)</label><input type="number" id="silenceRate" class="input-field" value="10"></div>
+                </div>
+                <button onclick="calculateAndPredict()" class="btn-primary w-full">开始测算</button>
+            </div>
+        </div>
+
+        <!-- 右侧结果区 -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="metric-card"><div class="text-sm">单台沉没成本</div><div class="metric-value" id="sunkCost">-</div><div class="text-xs">元</div></div>
+                <div class="metric-card"><div class="text-sm">回本周期</div><div class="metric-value" id="paybackMonths">-</div><div class="text-xs">月</div></div>
+                <div class="metric-card"><div class="text-sm">ROI</div><div class="metric-value" id="roi">-</div><div class="text-xs">%</div></div>
+                <div class="metric-card"><div class="text-sm">累计现金流</div><div class="metric-value" id="cumulativeCash">-</div><div class="text-xs">万元</div></div>
+            </div>
+            <div class="card"><h3 class="text-lg font-bold mb-4">现金流趋势</h3><canvas id="cashFlowChart" height="100"></canvas></div>
+            <div class="card overflow-x-auto"><h3 class="text-lg font-bold mb-4">月度明细</h3>
+                <table class="min-w-full text-sm"><thead class="bg-gray-50"><tr><th>月份</th><th>活跃用户</th><th>收入(万)</th><th>支出(万)</th><th>利润(万)</th><th>累计(万)</th></tr></thead><tbody id="resultTableBody"></tbody></table>
+            </div>
+
+            <!-- AI 聊天模块 -->
+            <div class="card">
+                <h3 class="text-lg font-bold mb-2">🤖 AI 智能顾问</h3>
+                <div id="chatContainer" class="h-80 overflow-y-auto border rounded-lg p-3 mb-3 bg-gray-50">
+                    <div class="chat-message"><span class="chat-ai">AI 顾问:</span><div class="chat-text">您好！请先点击“开始测算”生成财务数据。</div></div>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="chatInput" class="input-field flex-1" placeholder="例如：如何提高ROI？">
+                    <button onclick="sendToAI()" class="btn-primary" style="width: auto;">发送</button>
+                    <button onclick="clearChatHistory()" class="btn-primary" style="background-color: #6b7280;">清空对话</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ================== 全局变量 ==================
+    let cashFlowChart = null;
+    let currentResult = null;
+    let packageLibrary = [];
+    let chatMessages = [];
+
+    // 加载套餐库
+    async function loadPackageLibrary() {
+        try {
+            const response = await fetch('package_library.json');
+            if(response.ok) {
+                packageLibrary = await response.json();
+                console.log("加载真实套餐库成功，共", packageLibrary.length, "个分组");
+                return;
+            }
+        } catch(e) {}
+        console.warn("未找到 package_library.json，使用内置示例数据");
+        packageLibrary = [
+            { platform:"抖音", price:29, data_gb:100, type:"月包", category:"主套餐", period_days:30,
+              repurchase_rate: [1.0,0.72,0.58,0.49,0.43,0.38,0.34,0.31,0.28,0.26,0.24,0.22,0.20,0.19,0.18,0.17,0.16] },
+            { platform:"抖音", price:49, data_gb:200, type:"月包", category:"主套餐", period_days:30,
+              repurchase_rate: [1.0,0.68,0.55,0.47,0.42,0.37,0.33,0.30,0.27,0.25,0.23,0.21,0.19,0.18,0.17,0.16,0.15] },
+            { platform:"淘宝", price:29, data_gb:100, type:"月包", category:"主套餐", period_days:30,
+              repurchase_rate: [1.0,0.70,0.56,0.48,0.42,0.37,0.33,0.30,0.27,0.25,0.23,0.21,0.19,0.18,0.17,0.16,0.15] }
+        ];
+    }
+
+    function safe_log(x, eps=1e-6) { return Math.log(Math.max(x, eps)); }
+    function getVector(pkg) {
+        let price_log = safe_log(pkg.price);
+        let data_log = safe_log(pkg.data_gb);
+        let period_log = safe_log(pkg.period_days);
+        let type_vec = (pkg.type === '月包') ? [1,0] : [0,1];
+        let cat_map = { '主套餐':[1,0,0], '体验套餐':[0,1,0], '加油包':[0,0,1] };
+        let cat_vec = cat_map[pkg.category] || [0,0,0];
+        return [price_log, data_log, period_log, ...type_vec, ...cat_vec];
+    }
+    function weightedEuclidean(v1, v2, weights) {
+        let sum = 0;
+        for(let i=0; i<v1.length; i++) sum += weights[i] * (v1[i]-v2[i])**2;
+        return Math.sqrt(sum);
+    }
+    function predictRepurchaseRates(target) {
+        let candidates = packageLibrary.filter(p => p.platform === target.platform && p.type === target.type);
+        let manualArea = document.getElementById('manualInputArea');
+        if(candidates.length === 0) {
+            manualArea.style.display = 'block';
+            return null;
+        }
+        manualArea.style.display = 'none';
+        let targetVec = getVector(target);
+        let weights = [2.0, 1.5, 1.0, 0.5, 0.5, 0.3, 0.3, 0.3];
+        let distances = candidates.map(c => ({ dist: weightedEuclidean(targetVec, getVector(c), weights), pkg: c }));
+        distances.sort((a,b)=>a.dist - b.dist);
+        let top3 = distances.slice(0,3);
+        let sumWeight = 0;
+        let pred = new Array(17).fill(0);
+        for(let item of top3) {
+            let w = 1.0 / Math.max(item.dist, 1e-6);
+            sumWeight += w;
+            for(let t=0; t<17; t++) pred[t] += w * item.pkg.repurchase_rate[t];
+        }
+        for(let t=0; t<17; t++) pred[t] /= sumWeight;
+        return pred;
+    }
+    function parseManualRates(inputStr) {
+        if(!inputStr.trim()) return null;
+        let parts = inputStr.split(',').map(s => parseFloat(s.trim()));
+        if(parts.length !== 17) return null;
+        if(parts.some(v => isNaN(v) || v < 0 || v > 1)) return null;
+        return parts;
+    }
+    function updateMonths() { calculateAndPredict(); }
+
+    async function calculateAndPredict() {
+        let target = {
+            platform: document.getElementById('platform').value,
+            price: parseFloat(document.getElementById('price').value),
+            data_gb: parseFloat(document.getElementById('data_gb').value),
+            type: document.getElementById('type').value,
+            category: document.getElementById('category').value,
+            period_days: parseFloat(document.getElementById('period_days').value)
+        };
+        let repurchaseRates = predictRepurchaseRates(target);
+        let manualRates = parseManualRates(document.getElementById('manualRates').value.trim());
+
+        if(repurchaseRates === null && manualRates === null) {
+            alert("未找到相似套餐，请在下方手动输入17个月的复充率（用逗号分隔）。");
+            document.getElementById('manualInputArea').style.display = 'block';
+            return;
+        }
+        if(manualRates !== null) repurchaseRates = manualRates;
+
+        let months = parseInt(document.getElementById('forecastMonths').value) || 18;
+        let repRates = repurchaseRates.slice(0, months-1);
+        if(repRates.length < months-1) repRates.push(...new Array(months-1 - repRates.length).fill(0));
+
+        let totalShipment = parseInt(document.getElementById('totalShipment').value);
+        let hwCost = parseFloat(document.getElementById('hwCost').value);
+        let hwPrice = parseFloat(document.getElementById('hwPrice').value);
+        let marketingCost = parseFloat(document.getElementById('marketingCost').value);
+        let rent = parseFloat(document.getElementById('rent').value);
+        let wage = parseFloat(document.getElementById('wage').value);
+        let firstChargeRate = parseFloat(document.getElementById('firstChargeRate').value) / 100;
+        let refurbCost = parseFloat(document.getElementById('refurbCost').value);
+        let price = target.price;
+
+        let firstRate = firstChargeRate;
+        let totalExpense = totalShipment * (hwCost + marketingCost) + (rent + wage) + refurbCost - totalShipment * hwPrice;
+
+        let monthlyRevenue = new Array(months).fill(0);
+        monthlyRevenue[0] = totalShipment * firstRate * price;
+        for(let i=1; i<months; i++) {
+            let monthIdx = i-1;
+            let repRate = (monthIdx < repRates.length) ? repRates[monthIdx] : 0;
+            monthlyRevenue[i] = totalShipment * firstRate * repRate * price;
+        }
+
+        let monthlyProfit = new Array(months).fill(0);
+        monthlyProfit[0] = monthlyRevenue[0] - totalExpense;
+        for(let i=1; i<months; i++) monthlyProfit[i] = monthlyRevenue[i];
+        let cumulativeCash = 0;
+        let cumulativeHistory = [];
+        for(let i=0; i<months; i++) {
+            cumulativeCash += monthlyProfit[i];
+            cumulativeHistory.push(cumulativeCash);
+        }
+
+        let totalRevenue = monthlyRevenue.reduce((a,b)=>a+b,0);
+        let totalProfit = totalRevenue - totalExpense;
+        let roi = totalExpense===0 ? 0 : (totalProfit/totalExpense)*100;
+        let paybackMonths = -1;
+        let cum = 0;
+        for(let i=0; i<months; i++) {
+            cum += monthlyProfit[i];
+            if(cum>=0 && paybackMonths===-1) paybackMonths = i+1;
+        }
+        let sunkCost = (hwCost + marketingCost - hwPrice) > 0 ? (hwCost+marketingCost-hwPrice) : 0;
+
+        let monthlyDetails = [];
+        for(let i=0; i<months; i++) {
+            monthlyDetails.push({
+                month: i+1,
+                activeUsers: Math.floor(totalShipment * firstRate * (i===0 ? 1 : (repRates[i-1] || 0))),
+                revenue: monthlyRevenue[i],
+                expense: i===0 ? totalExpense : 0,
+                profit: monthlyProfit[i],
+                cumulative: cumulativeHistory[i]
+            });
+        }
+
+        let result = {
+            sunk_cost: sunkCost,
+            payback_months: paybackMonths>0?paybackMonths:months+1,
+            roi: roi,
+            cumulative_cash: cumulativeCash,
+            max_monthly_loss: Math.min(...monthlyProfit),
+            monthly_details: monthlyDetails,
+            monthly_profit: monthlyProfit,
+            monthly_revenue: monthlyRevenue,
+            cumulative_cash_history: cumulativeHistory,
+            active_users: monthlyDetails.map(d => d.activeUsers),
+            monthly_expense: totalExpense
+        };
+        currentResult = result;
+        displayResult(result, months);
+    }
+
+    function displayResult(data, months) {
+        document.getElementById('sunkCost').innerText = data.sunk_cost.toFixed(2);
+        document.getElementById('paybackMonths').innerText = data.payback_months;
+        document.getElementById('roi').innerText = data.roi.toFixed(1);
+        document.getElementById('cumulativeCash').innerText = (data.cumulative_cash/10000).toFixed(1);
+
+        let tbody = document.getElementById('resultTableBody');
+        tbody.innerHTML = '';
+        for(let i=0; i<months; i++) {
+            let profitClass = data.monthly_profit[i]>=0 ? 'text-profit' : 'text-loss';
+            tbody.innerHTML += `<tr class="border-b">
+                <td class="table-cell">M${i+1}</td>
+                <td class="table-cell">${data.active_users[i]}</td>
+                <td class="table-cell">¥${(data.monthly_revenue[i]/10000).toFixed(1)}万</td>
+                <td class="table-cell">${i===0 ? '¥'+(data.monthly_expense/10000).toFixed(1)+'万' : '-'}</td>
+                <td class="table-cell font-bold ${profitClass}">¥${(data.monthly_profit[i]/10000).toFixed(1)}万</td>
+                <td class="table-cell font-bold">¥${(data.cumulative_cash_history[i]/10000).toFixed(1)}万</td>
+             </tr>`;
+        }
+        if(cashFlowChart) cashFlowChart.destroy();
+        let ctx = document.getElementById('cashFlowChart').getContext('2d');
+        cashFlowChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length:months}, (_,i)=>`M${i+1}`),
+                datasets: [
+                    { label:'累计现金流', data:data.cumulative_cash_history, borderColor:'#2563eb', fill:true },
+                    { label:'月利润', data:data.monthly_profit, borderColor:'#10b981', borderDash:[5,5], fill:false }
+                ]
+            },
+            options: { responsive: true }
+        });
+    }
+
+    // ================== AI 对话（修复版：只传 messages 字段）==================
+    const SYSTEM_PROMPT = `你是一个专业的随身WiFi业务财务顾问。用户会提供财务测算数据。请根据数据给出专业建议：\n1. 回本周期是否超过12个月；\n2. ROI是否低于30%；\n3. 累计现金流正负；\n4. 最大单月亏损是否超过5万元；\n5. 指出现金流压力最大的月份；\n6. 给出2-3条改进建议。\n回答要简洁，分条列出。`;
+
+    function formatFinancialContext(result) {
+        if (!result) return "用户尚未进行财务测算。\n";
+        let text = `回本周期:${result.payback_months}个月\nROI:${result.roi.toFixed(1)}%\n累计现金流:${(result.cumulative_cash/10000).toFixed(2)}万元\n最大单月亏损:${result.max_monthly_loss.toFixed(0)}元\n月度明细:\n`;
+        for(let d of result.monthly_details) {
+            text += `${d.month}月 | 收入:${d.revenue.toFixed(0)} | 利润:${d.profit.toFixed(0)} | 累计:${d.cumulative.toFixed(0)}\n`;
+        }
+        return text;
+    }
+
+    async function sendToAI() {
+        let question = document.getElementById('chatInput').value.trim();
+        if(!question) return;
+        let container = document.getElementById('chatContainer');
+        container.innerHTML += `<div class="chat-message"><span class="chat-user">您:</span><div class="chat-text">${escapeHtml(question)}</div></div>`;
+        document.getElementById('chatInput').value = '';
+        container.scrollTop = container.scrollHeight;
+
+        const loadingId = "loading_" + Date.now();
+        container.innerHTML += `<div id="${loadingId}" class="chat-message"><span class="chat-ai">AI 顾问:</span><div class="chat-text">正在分析...</div></div>`;
+        container.scrollTop = container.scrollHeight;
+
+        try {
+            let financialContext = formatFinancialContext(currentResult);
+            let apiMessages = [
+                { role: "system", content: SYSTEM_PROMPT },
+                ...chatMessages,
+                { role: "user", content: `${financialContext}\n用户问题：${question}` }
+            ];
+
+            // ✅ 修复：只发送 messages 字段，不再发送 model, temperature 等多余字段
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: apiMessages })
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            let reply = data.choices?.[0]?.message?.content || "抱歉，无法给出建议。";
+
+            document.getElementById(loadingId)?.remove();
+            container.innerHTML += `<div class="chat-message"><span class="chat-ai">AI 顾问:</span><div class="chat-text">${reply.replace(/\n/g,'<br>')}</div></div>`;
+
+            chatMessages.push({ role: "user", content: question });
+            chatMessages.push({ role: "assistant", content: reply });
+            if (chatMessages.length > 20) chatMessages = chatMessages.slice(-20);
+        } catch(e) {
+            document.getElementById(loadingId)?.remove();
+            container.innerHTML += `<div class="chat-message"><span class="chat-ai">AI 顾问:</span><div class="chat-text">AI服务暂时不可用: ${e.message}</div></div>`;
+        }
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+    function clearChatHistory() {
+        chatMessages = [];
+        document.getElementById('chatContainer').innerHTML = `<div class="chat-message"><span class="chat-ai">AI 顾问:</span><div class="chat-text">对话已清空。</div></div>`;
+    }
+    window.onload = function() {
+        loadPackageLibrary().then(() => calculateAndPredict());
+        document.getElementById('manualRates').addEventListener('input', function() {
+            let val = this.value.trim();
+            if(!val) this.style.borderColor = '#d1d5db';
+            else {
+                let parts = val.split(',').map(s=>parseFloat(s.trim()));
+                if(parts.length===17 && parts.every(v=>!isNaN(v)&&v>=0&&v<=1)) this.style.borderColor = '#10b981';
+                else this.style.borderColor = '#ef4444';
+            }
+        });
+    };
+</script>
+</body>
+</html>
